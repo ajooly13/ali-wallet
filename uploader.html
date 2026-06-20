@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>رافع الملفات — GitHub</title>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #0d0f1a; color: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; direction: rtl; }
+  .box { background: #151929; border: 1px solid #252a42; border-radius: 20px; padding: 32px 28px; width: 360px; max-width: 95vw; }
+  h2 { margin: 0 0 8px; font-size: 1.2rem; color: #818cf8; }
+  p { font-size: 0.8rem; color: #64748b; margin-bottom: 24px; }
+  label { display: block; font-size: 0.78rem; color: #64748b; margin-bottom: 5px; }
+  input { width: 100%; background: #1c2035; border: 1px solid #252a42; border-radius: 10px; padding: 11px 13px; color: #e2e8f0; font-size: 0.9rem; box-sizing: border-box; direction: ltr; margin-bottom: 16px; }
+  input:focus { outline: none; border-color: #6366f1; }
+  .file-zone { border: 2px dashed #252a42; border-radius: 12px; padding: 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: border-color 0.2s; }
+  .file-zone:hover, .file-zone.over { border-color: #6366f1; }
+  .file-zone input[type=file] { display: none; }
+  .file-name { font-size: 0.8rem; color: #10b981; margin-top: 8px; font-weight: 700; }
+  .btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; border: none; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: opacity 0.2s; }
+  .btn:hover { opacity: 0.9; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #status { margin-top: 16px; padding: 12px; border-radius: 10px; font-size: 0.85rem; display: none; text-align: center; }
+  .ok { background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.3); color: #10b981; }
+  .err { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #ef4444; }
+  .loading { background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3); color: #818cf8; }
+  a { color: #10b981; text-decoration: none; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>🚀 رافع GitHub</h2>
+  <p>ارفع budget-manager.html مباشرة لـ GitHub Pages بضغطة واحدة</p>
+
+  <label>GitHub Personal Access Token</label>
+  <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+
+  <label>اختر الملف</label>
+  <div class="file-zone" id="zone" onclick="document.getElementById('file-input').click()">
+    <div>📁 اضغط لاختيار الملف</div>
+    <div style="font-size:0.72rem;color:#64748b;margin-top:4px">budget-manager.html</div>
+    <input type="file" id="file-input" accept=".html" onchange="onFileSelect(this)">
+    <div class="file-name" id="fname"></div>
+  </div>
+
+  <button class="btn" id="upload-btn" onclick="upload()">⬆️ رفع الملف الآن</button>
+  <div id="status"></div>
+</div>
+
+<script>
+let fileContent = null;
+
+const zone = document.getElementById('zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) readFile(f);
+});
+
+function onFileSelect(inp) {
+  if (inp.files[0]) readFile(inp.files[0]);
+}
+
+function readFile(f) {
+  const r = new FileReader();
+  r.onload = e => {
+    fileContent = e.target.result;
+    document.getElementById('fname').textContent = '✅ ' + f.name + ' — جاهز';
+  };
+  r.readAsText(f, 'UTF-8');
+}
+
+async function upload() {
+  const token = document.getElementById('token').value.trim();
+  const btn = document.getElementById('upload-btn');
+  const st = document.getElementById('status');
+
+  if (!token) { showStatus('⚠️ أدخل التوكن أولاً', 'err'); return; }
+  if (!fileContent) { showStatus('⚠️ اختر الملف أولاً', 'err'); return; }
+
+  btn.disabled = true;
+  showStatus('⏳ جاري الرفع...', 'loading');
+
+  // Check if file already exists (to get SHA for update)
+  const owner = 'ajooly13';
+  const repo  = 'ali-wallet';
+  const path  = 'budget-manager.html';
+  const apiBase = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+
+  let sha = null;
+  try {
+    const check = await fetch(apiBase, { headers: { Authorization: 'token ' + token } });
+    if (check.ok) { const j = await check.json(); sha = j.sha; }
+  } catch(_) {}
+
+  // Encode to base64
+  const encoded = btoa(unescape(encodeURIComponent(fileContent)));
+
+  const body = {
+    message: 'Add budget-manager.html via uploader',
+    content: encoded,
+  };
+  if (sha) body.sha = sha;
+
+  try {
+    const res = await fetch(apiBase, {
+      method: 'PUT',
+      headers: {
+        Authorization: 'token ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const j = await res.json();
+    if (res.ok) {
+      showStatus(`✅ تم الرفع! الرابط جاهز خلال دقيقة:<br><a href="https://${owner}.github.io/${repo}/budget-manager.html" target="_blank">https://${owner}.github.io/${repo}/budget-manager.html</a>`, 'ok');
+    } else {
+      showStatus('❌ خطأ: ' + (j.message || res.status), 'err');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showStatus('❌ خطأ في الاتصال: ' + e.message, 'err');
+    btn.disabled = false;
+  }
+}
+
+function showStatus(msg, cls) {
+  const st = document.getElementById('status');
+  st.innerHTML = msg;
+  st.className = cls;
+  st.style.display = 'block';
+}
+</script>
+</body>
+</html>
